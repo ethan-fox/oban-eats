@@ -161,14 +161,6 @@ oban-playground/
 └── README.md                # This file
 ```
 
-## Key Features
-
-- **Transactional Job Enqueueing**: Orders and jobs committed atomically
-- **Two Priority Queues**: High priority (5 workers), Low priority (10 workers)
-- **Horizontal Scaling**: API and Worker services scale independently
-- **Layer-Based Architecture**: DAO → Service → Router separation
-- **Comprehensive Testing**: 90%+ branch coverage target
-
 ## Database Schema
 
 **Tables:**

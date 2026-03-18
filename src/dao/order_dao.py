@@ -1,13 +1,14 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from src.model.db.order_orm import OrderORM
 from uuid import UUID
 
 
 class OrderDAO:
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
-    def create(self, order: OrderORM) -> OrderORM:
+    async def create(self, order: OrderORM) -> OrderORM:
         """
         Create new order record.
 
@@ -16,9 +17,10 @@ class OrderDAO:
         the order ID for creating jobs in the same transaction.
         """
         self.db.add(order)
-        self.db.flush()
+        await self.db.flush()
         return order
 
-    def find_by_id(self, order_id: UUID) -> OrderORM | None:
+    async def find_by_id(self, order_id: UUID) -> OrderORM | None:
         """Find order by ID."""
-        return self.db.query(OrderORM).filter(OrderORM.id == order_id).first()
+        result = await self.db.execute(select(OrderORM).filter(OrderORM.id == order_id))
+        return result.scalar_one_or_none()

@@ -7,8 +7,8 @@ from src.model.db.base import Base
 
 
 class OrderORM(Base):
-    __tablename__ = "order"
+    __tablename__ = "orders"
 
-    id: uuid_module.UUID = Column(UUID(as_uuid=True), primary_key=True, default=uuid_module.uuid4)
-    table_id: str = Column(String(255), nullable=False, index=True)
-    created_at: datetime = Column(TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid_module.uuid4)
+    table_id = Column(String(255), nullable=False, index=True)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False)

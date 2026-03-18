@@ -16,4 +16,4 @@ async def create_order(
     Create a new restaurant order.
     Creates order record and enqueues meal preparation jobs.
     """
-    return service.create_order(request)
+    return await service.create_order(request)

@@ -1,30 +1,29 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
-from typing import Generator
-from src.config.settings import get_settings
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from typing import AsyncGenerator
 
 
 class DatabaseManager:
     def __init__(self, database_url: str):
-        self.engine = create_engine(
-            database_url,
+        # Convert postgresql:// to postgresql+psycopg://
+        async_url = database_url.replace("postgresql://", "postgresql+psycopg://")
+
+        self.engine = create_async_engine(
+            async_url,
             pool_pre_ping=True,
             pool_size=10,
             max_overflow=20
         )
-        self.SessionLocal = sessionmaker(
-            autocommit=False,
-            autoflush=False,
-            bind=self.engine
+        self.SessionLocal = async_sessionmaker(
+            self.engine,
+            class_=AsyncSession,
+            expire_on_commit=False
         )
 
-    def get_session(self) -> Generator[Session, None, None]:
-        session = self.SessionLocal()
-        try:
-            yield session
-            session.commit()
-        except Exception:
-            session.rollback()
-            raise
-        finally:
-            session.close()
+    async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
+        async with self.SessionLocal() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise

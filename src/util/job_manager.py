@@ -1,23 +1,23 @@
 from oban import Oban, Job
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class JobManager:
-    def __init__(self, oban: Oban, session: Session):
+    def __init__(self, oban: Oban, session: AsyncSession):
         self.oban = oban
         self.session = session
 
-    def enqueue(self, job) -> Job:
+    async def enqueue(self, job) -> Job:
         """
         Enqueue single job transactionally.
-        Always uses enqueue_many() with session for atomicity.
+        Uses session's connection for atomicity with DB operations.
         """
-        jobs = self.oban.enqueue_many([job], conn=self.session)
+        jobs = await self.oban.enqueue_many([job], conn=self.session)
         return jobs[0]
 
-    def enqueue_many(self, jobs: list) -> list[Job]:
+    async def enqueue_many(self, jobs: list) -> list[Job]:
         """
         Enqueue multiple jobs transactionally.
         All jobs enqueued atomically with database session.
         """
-        return self.oban.enqueue_many(jobs, conn=self.session)
+        return await self.oban.enqueue_many(jobs, conn=self.session)

@@ -17,14 +17,14 @@ depends_on = None
 
 def upgrade() -> None:
     op.create_table(
-        'order',
+        'orders',
         sa.Column('id', UUID(as_uuid=True), primary_key=True),
         sa.Column('table_id', sa.String(255), nullable=False),
         sa.Column('created_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
     )
-    op.create_index('idx_order_table_id', 'order', ['table_id'])
+    op.create_index('idx_orders_table_id', 'orders', ['table_id'])
 
 
 def downgrade() -> None:
-    op.drop_index('idx_order_table_id')
-    op.drop_table('order')
+    op.drop_index('idx_orders_table_id')
+    op.drop_table('orders')
