@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from prometheus_client import make_asgi_app
 from src.config.settings import get_settings
 from src.config.middleware import apply_middleware
 from src.config.dependency import initialize_oban, cleanup_oban
@@ -30,6 +31,9 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router.router)
     app.include_router(order_router.router)
+
+    metrics_app = make_asgi_app()
+    app.mount("/metrics", metrics_app)
 
     return app
 
