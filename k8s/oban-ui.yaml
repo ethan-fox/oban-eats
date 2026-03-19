@@ -105,7 +105,7 @@ spec:
   rules:
   - http:
       paths:
-      - path: /oban(/|$)(.*)
+      - path: /oban-ui(/|$)(.*)
         pathType: ImplementationSpecific
         backend:
           service:
