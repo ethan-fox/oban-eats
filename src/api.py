@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from prometheus_client import make_asgi_app
+from prometheus_fastapi_instrumentator import Instrumentator
+
 from src.config.settings import get_settings
 from src.config.middleware import apply_middleware
 from src.config.dependency import initialize_oban, cleanup_oban
@@ -20,10 +22,7 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    """
-    API service application factory.
-    Only handles REST endpoints - does NOT process jobs.
-    """
+
     settings = get_settings()
     app = FastAPI(title=settings.api_title, lifespan=lifespan)
 
@@ -35,7 +34,9 @@ def create_app() -> FastAPI:
     metrics_app = make_asgi_app()
     app.mount("/metrics", metrics_app)
 
+    Instrumentator().instrument(app).expose(app)
+
     return app
 
-
 app = create_app()
+

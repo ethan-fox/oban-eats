@@ -4,6 +4,7 @@ uvicorn[standard]==0.42.0
 
 # Monitoring
 prometheus-client==0.24.1
+prometheus-fastapi-instrumentator==7.1.0
 
 # Database
 sqlalchemy==2.0.48
