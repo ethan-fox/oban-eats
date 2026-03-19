@@ -1,51 +1,16 @@
 # Oban-Playground: FastAPI + Oban-py Minimal Demo
 
-A minimal FastAPI application demonstrating asynchronous job processing with Oban-py and PostgreSQL.
+A minimal FastAPI application demonstrating asynchronous job processing with oban-py and PostgreSQL. Optional deployment on Bare metal (docker desktop) or minikube
 
 ## Domain Model
 
 This application simulates a **Restaurant Kitchen** where:
-- Orders are received from tables via REST API
+- Orders are placed via REST API
 - Each meal in an order becomes a separate background job
 - Worker processes prepare meals asynchronously
-- Both API and Worker services share the same codebase
-
-## Architecture
-
-### Two Services, One Codebase
-
-**API Service** (`src/api.py`)
-- Accepts restaurant orders via `POST /v1/order`
-- Creates order records in database
-- Enqueues meal preparation jobs
-- Does NOT execute jobs
-- Scales based on HTTP traffic
-
-**Worker Service** (`src/worker_main.py`)
-- Polls Oban queue for meal preparation jobs
-- Executes jobs (logs + simulates 1s preparation)
-- Does NOT handle HTTP requests
-- Scales based on queue depth
-
-### Layer Structure
-
-```
-src/
-├── api.py                    # API service entry point
-├── worker_main.py            # Worker service entry point
-├── config/                   # Settings, DI, middleware
-├── dao/                      # Database operations
-├── service/                  # Business logic
-├── router/                   # API endpoints
-├── model/                    # Data models (api/, view/, db/)
-├── worker/                   # Job workers
-└── util/                     # Database, job managers
-```
-
-## Setup
 
 ### Prerequisites
-- Python 3.11+
+- Python 3.12
 - Docker and Docker Compose (for PostgreSQL)
 
 ### Installation
@@ -70,7 +35,6 @@ pip install -r requirements.txt
 4. Configure environment
 ```bash
 cp .env.example .env
-# Edit .env if needed (defaults work for local development)
 ```
 
 5. Start PostgreSQL
@@ -134,43 +98,268 @@ Response:
 
 Watch the Worker service logs to see meals being prepared!
 
-## Testing
+## Kubernetes Deployment (Minikube)
 
-Run all tests:
+This application includes Kubernetes manifests for deploying to minikube as a production-like environment.
+
+### Prerequisites
+- Docker
+- Minikube
+- kubectl
+
+### Start Minikube
+
+Start minikube if not already running:
+
 ```bash
-pytest
+minikube start
 ```
 
-Run with coverage:
+### Install NGINX Ingress Controller via Helm
+
+Add the NGINX Ingress Helm repository:
+
 ```bash
-pytest --cov=src --cov-report=html
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo update
 ```
 
-## Project Structure
+Install the NGINX Ingress Controller as a LoadBalancer on port 8000:
 
-```
-oban-playground/
-├── src/                      # Application source code
-├── tests/                    # Test suite
-├── alembic/                  # Database migrations
-├── docker-compose.yml        # PostgreSQL container
-├── requirements.txt          # Python dependencies
-├── pytest.ini               # Test configuration
-├── alembic.ini              # Migration configuration
-├── .env.example             # Environment template
-└── README.md                # This file
+```bash
+helm install ingress-nginx ingress-nginx/ingress-nginx \
+  --namespace ingress-nginx \
+  --create-namespace \
+  --set controller.service.type=LoadBalancer \
+  --set controller.service.ports.http=8000
 ```
 
-## Database Schema
+This installs the controller with LoadBalancer service type on port 8000.
 
-**Tables:**
-- `order` - Restaurant orders
-- `oban_jobs` - Oban job queue
-- `oban_peers` - Oban worker coordination
+Verify the ingress controller is running:
+
+```bash
+kubectl get pods -n ingress-nginx
+kubectl get svc -n ingress-nginx
+```
+
+### Build Docker Image
+
+Build a single Docker image used by all services (API, Worker, Migration):
+
+```bash
+docker build -t oban-eats:latest .
+```
+
+The same image is used for all services - the command is specified at runtime in the Kubernetes manifests:
+- **API**: Uses default CMD (`uvicorn src.api:app --host 0.0.0.0 --port 8000`)
+- **Worker**: Overrides with `command: ["python", "-m", "src.worker_main"]`
+- **Migration**: Overrides with `command: ["alembic", "upgrade", "head"]`
+
+### Load Image into Minikube
+
+Minikube runs in its own Docker environment, so the image must be loaded:
+
+```bash
+minikube image load oban-eats:latest
+```
+
+### Deploy to Kubernetes
+
+Apply manifests in order (infrastructure first, then applications):
+
+```bash
+# Create namespace and configuration
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/configmap.yaml
+
+# Deploy PostgreSQL database
+kubectl apply -f k8s/db.yaml
+
+# Wait for database to be ready
+kubectl wait --for=condition=ready pod -l app=postgres -n oban-eats --timeout=120s
+
+# Deploy API, Worker, and Oban UI services
+kubectl apply -f k8s/api.yaml
+kubectl apply -f k8s/worker.yaml
+kubectl apply -f k8s/oban-ui.yaml
+```
+
+### Verify Deployment
+
+Check that all pods are running:
+
+```bash
+# View all pods in the namespace
+kubectl get pods -n oban-eats
+
+# Expected output:
+# postgres-xxx          1/1     Running
+# oban-api-xxx          1/1     Running
+# oban-worker-xxx       1/1     Running  (2 replicas)
+# oban-ui-xxx           1/1     Running
+```
+
+Check services and ingress:
+
+```bash
+kubectl get svc -n oban-eats
+kubectl get ingress -n oban-eats
+```
+
+### Expose Ingress with Minikube Tunnel
+
+In a separate terminal, start the minikube tunnel (requires sudo):
+
+```bash
+minikube tunnel
+```
+
+This exposes the Ingress Controller on localhost. Keep this running in the background.
+
+The NGINX Ingress Controller is configured to run on port 8000, so your services will be accessible at `http://localhost:8000`.
+
+### Test the Deployment
+
+Test the API health endpoint:
+
+```bash
+curl http://localhost:8000/api/health
+```
+
+Create a test order:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/order \
+  -H "Content-Type: application/json" \
+  -d '{
+    "table_id": "table-k8s-test",
+    "meals": [
+      {"menu_item_id": "burger", "metadata": {"no_onions": true}},
+      {"menu_item_id": "fries", "metadata": {}}
+    ]
+  }'
+```
+
+Watch worker logs to see job processing:
+
+```bash
+kubectl logs -n oban-eats -l app=oban-worker -f
+```
+
+### Access Oban UI Dashboard
+
+The Oban UI dashboard is available at:
+
+```
+http://localhost:8000/oban
+```
+
+The dashboard provides a web interface to:
+- Monitor job queues and execution status
+- View job details and history
+- Inspect failed jobs and errors
+- Cancel, retry, or delete jobs (if read-only mode is disabled)
+
+**Security Note**: For production use, enable HTTP Basic Authentication by uncommenting and setting the `BASIC_AUTH_USER` and `BASIC_AUTH_PASS` environment variables in `k8s/oban-ui.yaml`, then reapply the manifest.
+
+### Troubleshooting
+
+View pod details and events:
+
+```bash
+kubectl describe pod <pod-name> -n oban-eats
+```
+
+Check init container logs (if migration fails):
+
+```bash
+kubectl logs <pod-name> -n oban-eats -c migration
+```
+
+Check application logs:
+
+```bash
+# API logs
+kubectl logs -n oban-eats -l app=oban-api
+
+# Worker logs
+kubectl logs -n oban-eats -l app=oban-worker
+
+# Database logs
+kubectl logs -n oban-eats -l app=postgres
+
+# Oban UI logs
+kubectl logs -n oban-eats -l app=oban-ui
+```
+
+Connect to the database:
+
+```bash
+kubectl exec -it -n oban-eats <postgres-pod-name> -- \
+  psql -U admin oban_eats
+```
+
+### Scaling
+
+Scale the API service:
+
+```bash
+kubectl scale deployment oban-api -n oban-eats --replicas=3
+```
+
+Scale the Worker service:
+
+```bash
+kubectl scale deployment oban-worker -n oban-eats --replicas=5
+```
+
+### Cleanup
+
+Remove all resources:
+
+```bash
+kubectl delete namespace oban-eats
+```
+
+Or remove individual resources:
+
+```bash
+kubectl delete -f k8s/worker.yaml
+kubectl delete -f k8s/api.yaml
+kubectl delete -f k8s/db.yaml
+kubectl delete -f k8s/configmap.yaml
+kubectl delete -f k8s/namespace.yaml
+```
+
+## Architecture
+
+### Kubernetes Components
+
+```
+k8s/
+├── namespace.yaml          # Resource isolation
+├── configmap.yaml         # Application configuration
+├── db.yaml                # PostgreSQL with persistent storage
+├── api.yaml               # API deployment, service, ingress
+├── worker.yaml            # Worker deployment
+└── oban-ui.yaml           # Oban UI dashboard deployment, service, ingress
+```
+
+**Key Features:**
+- Single Docker image with runtime command overrides for API, Worker, and Migration
+- Init containers run database migrations before services start
+- PostgreSQL with persistent volume (survives pod restarts)
+- API exposed via LoadBalancer service
+- Worker scales independently (2 replicas by default)
+- Horizontal Pod Autoscaler for API (1-10 replicas based on CPU)
+- Health probes ensure reliability
 
 ## Future Enhancements
 
-- Kubernetes deployment manifests
-- Prometheus metrics
+- Production secrets management (Kubernetes Secrets)
+- Ingress controller for external access
+- Prometheus metrics and monitoring
 - Job status API endpoints
 - Retry policies and dead letter queue
+- Database replication for high availability

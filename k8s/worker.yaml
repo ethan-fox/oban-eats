@@ -1,0 +1,90 @@
+---
+# Worker Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oban-worker
+  namespace: oban-eats
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: oban-worker
+  template:
+    metadata:
+      labels:
+        app: oban-worker
+    spec:
+      initContainers:
+      - name: migration
+        image: oban-eats:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: oban-config
+              key: ENVIRONMENT
+        - name: POSTGRES_USER
+          valueFrom:
+            configMapKeyRef:
+              name: oban-config
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            configMapKeyRef:
+              name: oban-config
+              key: POSTGRES_PASSWORD
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: oban-config
+              key: POSTGRES_DB
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres-service:5432/$(POSTGRES_DB)"
+        command: ["alembic", "upgrade", "head"]
+
+      containers:
+      - name: worker
+        image: oban-eats:latest
+        imagePullPolicy: IfNotPresent
+        command: ["python", "-m", "src.worker_main"]
+        env:
+        - name: ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: oban-config
+              key: ENVIRONMENT
+        - name: POSTGRES_USER
+          valueFrom:
+            configMapKeyRef:
+              name: oban-config
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            configMapKeyRef:
+              name: oban-config
+              key: POSTGRES_PASSWORD
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: oban-config
+              key: POSTGRES_DB
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres-service:5432/$(POSTGRES_DB)"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "import sys; sys.exit(0)"
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          failureThreshold: 3

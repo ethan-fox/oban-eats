@@ -1,0 +1,114 @@
+---
+# Oban UI Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oban-ui
+  namespace: oban-eats
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oban-ui
+  template:
+    metadata:
+      labels:
+        app: oban-ui
+    spec:
+      containers:
+      - name: oban-ui
+        image: ghcr.io/oban-bg/oban-dash:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 4000
+          name: http
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            configMapKeyRef:
+              name: oban-config
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            configMapKeyRef:
+              name: oban-config
+              key: POSTGRES_PASSWORD
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: oban-config
+              key: POSTGRES_DB
+        - name: DATABASE_URL
+          value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres-service:5432/$(POSTGRES_DB)"
+        - name: PORT
+          value: "4000"
+        - name: POOL_SIZE
+          value: "5"
+        - name: OBAN_PREFIX
+          value: "public"
+        - name: OBAN_READ_ONLY
+          value: "false"
+        - name: LOG_LEVEL
+          value: "info"
+        # Optional: Enable basic auth for security (uncomment and set credentials)
+        # - name: BASIC_AUTH_USER
+        #   value: "admin"
+        # - name: BASIC_AUTH_PASS
+        #   value: "changeme"
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 4000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 4000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+
+---
+# Oban UI Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: oban-ui-service
+  namespace: oban-eats
+spec:
+  selector:
+    app: oban-ui
+  ports:
+  - port: 4000
+    targetPort: 4000
+    protocol: TCP
+  type: ClusterIP
+
+---
+# Oban UI Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: oban-ui-ingress
+  namespace: oban-eats
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /oban(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: oban-ui-service
+            port:
+              number: 4000

@@ -7,7 +7,6 @@ class Environment(str, Enum):
     LOCAL = "LOCAL"
     PROD = "PROD"
 
-
 class Settings(BaseSettings):
     environment: Environment = Environment.LOCAL
     database_url: str
