@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from src.config.settings import get_settings
 from src.config.middleware import apply_middleware
 from src.config.dependency import initialize_oban, cleanup_oban
+from src.config.logging import configure_logging
 from src.router import health_router, order_router
 
 
@@ -10,6 +11,7 @@ from src.router import health_router, order_router
 async def lifespan(app: FastAPI):
     """Manage app lifecycle: startup and shutdown."""
     # Startup
+    configure_logging()
     await initialize_oban()
     yield
     # Shutdown

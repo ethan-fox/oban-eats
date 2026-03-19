@@ -21,6 +21,9 @@ class OrderService:
         Create order and enqueue meal preparation jobs.
         Transactional: order and all meal jobs committed atomically.
         """
+
+        logger.info(f"Got new order for table '{order_request.table_id}'")
+
         order = OrderORM(table_id=order_request.table_id)
         created_order = await self.order_dao.create(order)
 
@@ -33,9 +36,9 @@ class OrderService:
             for meal in order_request.meals
         ]
 
-        print("doing something", prepared_jobs)
-
         await self.job_manager.enqueue_many(prepared_jobs)
+
+        logger.info(f"Ordered {len(prepared_jobs)} meal(s) for table '{order_request.table_id}'")
 
         return OrderCreatedView(
             order_id=created_order.id,

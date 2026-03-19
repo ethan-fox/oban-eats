@@ -4,6 +4,8 @@ import logging
 
 from src.model.worker.meal_order_args import MealOrderArgs
 
+logger = logging.getLogger(__name__)
+
 
 @worker(queue="low_priority")
 class MealOrderWorker:
@@ -14,9 +16,12 @@ class MealOrderWorker:
         """
         args = MealOrderArgs(**job.args)
 
-        logging.info(f"Received new meal order for Order ID {args.order_id} (menu item: {args.menu_item_id})")
+        logger.info(f"Received new meal order for Order ID {args.order_id} (menu item: {args.menu_item_id})")
+        
+        if args.has_special_instructions:
+            logger.info(f"Special instructions: {args.metadata}")
 
-        time.sleep(1)
+        time.sleep(30)
 
-        logging.info(f"Completed meal for Order ID {args.order_id}")
+        logger.info(f"Completed meal for Order ID {args.order_id}")
         return {"status": "completed", "order_id": args.order_id}
