@@ -252,7 +252,7 @@ kubectl logs -n oban-eats -l app=oban-worker -f
 The Oban UI dashboard is available at:
 
 ```
-http://localhost:8000/oban-ui
+http://localhost:8000/oban
 ```
 
 The dashboard provides a web interface to:

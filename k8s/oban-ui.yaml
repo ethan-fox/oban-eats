@@ -96,14 +96,23 @@ metadata:
   name: oban-ui-ingress
   namespace: oban-eats
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/websocket-services: oban-ui-service
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
 spec:
   ingressClassName: nginx
   rules:
   - http:
       paths:
-      - path: /oban-ui(/|$)(.*)
-        pathType: ImplementationSpecific
+      - path: /oban
+        pathType: Prefix
+        backend:
+          service:
+            name: oban-ui-service
+            port:
+              number: 4000
+      - path: /live
+        pathType: Prefix
         backend:
           service:
             name: oban-ui-service
