@@ -6,7 +6,7 @@ metadata:
   name: oban-worker
   namespace: oban-eats
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: oban-worker

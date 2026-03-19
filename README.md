@@ -151,14 +151,14 @@ Build a single Docker image used by all services (API, Worker, Migration):
 docker build -t oban-eats:latest .
 ```
 
-The same image is used for all services - the command is specified at runtime in the Kubernetes manifests:
+The same image is used for all services (command is specified at runtime in the Kubernetes manifests):
 - **API**: Uses default CMD (`uvicorn src.api:app --host 0.0.0.0 --port 8000`)
 - **Worker**: Overrides with `command: ["python", "-m", "src.worker_main"]`
 - **Migration**: Overrides with `command: ["alembic", "upgrade", "head"]`
 
 ### Load Image into Minikube
 
-Minikube runs in its own Docker environment, so the image must be loaded:
+Minikube runs in its own Docker environment, so the image must be loaded (this may take a minute or two):
 
 ```bash
 minikube image load oban-eats:latest

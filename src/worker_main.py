@@ -20,9 +20,12 @@ async def main():
 
     settings = get_settings()
 
+    QUEUES = {"high_priority": 1, "low_priority": 1}
+
+    pool = await Oban.create_pool(dsn=settings.database_url)
     oban = Oban(
-        pool=await Oban.create_pool(dsn=settings.database_url),
-        queues={"high_priority": 5, "low_priority": 10},
+        pool=pool,
+        queues=QUEUES,
         lifeline={"interval": 15, "rescue_after": 60},
         metrics=True
     )
@@ -33,7 +36,7 @@ async def main():
     shutdown_event = asyncio.Event()
 
     # Handle shutdown signals
-    def handle_shutdown(sig, frame):
+    def handle_shutdown(sig, _frame):
         logger.info(f"Received signal {sig}, gracefully stopping worker...")
         shutdown_event.set()
 
@@ -44,9 +47,12 @@ async def main():
         logger.info("Oban worker running. Press Ctrl+C to stop.")
         await shutdown_event.wait()
     finally:
-        logger.info("Shutting down Oban...")
+        logger.info("Gracefully shutting down Oban...")
+        # Now stop Oban completely, allows current jobs to finish
         await oban.stop()
-        logger.info("Oban worker service stopped.")
+        # Close the connection pool; Oban does not do this itself
+        await pool.close()
+        logger.debug("Oban worker service stopped.")
 
 
 if __name__ == "__main__":

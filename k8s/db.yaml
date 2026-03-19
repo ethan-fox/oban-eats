@@ -1,5 +1,4 @@
 ---
-# PersistentVolumeClaim for database storage
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -14,7 +13,6 @@ spec:
   storageClassName: standard
 
 ---
-# PostgreSQL Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -84,7 +82,6 @@ spec:
           claimName: postgres-pvc
 
 ---
-# PostgreSQL Service
 apiVersion: v1
 kind: Service
 metadata:

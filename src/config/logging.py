@@ -9,5 +9,5 @@ def configure_logging(log_level: str = "INFO") -> None:
 
     logging.basicConfig(
         level=level,
-        format="%(asctime)s#%(name)s [%(levelname)s] %(message)s"
+        format="[%(levelname)s] %(asctime)s#%(name)s: %(message)s"
     )
