@@ -47,13 +47,16 @@ spec:
       - name: worker
         image: oban-eats:latest
         imagePullPolicy: IfNotPresent
-        command: ["python", "-m", "src.worker_main"]
         env:
+        - name: MODE
+          value: "worker"
         - name: ENVIRONMENT
           valueFrom:
             configMapKeyRef:
               name: oban-config
               key: ENVIRONMENT
+        - name: API_TITLE
+          value: "Oban Eats Worker"
         - name: POSTGRES_USER
           valueFrom:
             configMapKeyRef:

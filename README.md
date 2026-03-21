@@ -15,40 +15,34 @@ This application simulates a **Restaurant Kitchen** where:
 
 ### Installation
 
-1. Clone the repository
-```bash
-git clone <repo-url>
-cd oban-eats
-```
-
-2. Create virtual environment
+1. Create virtual environment
 ```bash
 python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-3. Install dependencies
+2. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-4. Configure environment
+3. Configure environment
 ```bash
 cp .env.example .env
 ```
 
-5. Start PostgreSQL
+4. Start PostgreSQL
 ```bash
 docker-compose up -d
 ```
 
-6. Wait for PostgreSQL to be ready (about 5-10 seconds)
+5. Wait for PostgreSQL to be ready (about 5-10 seconds)
 ```bash
 docker-compose ps
 # Wait until status shows "healthy"
 ```
 
-7. Run database migrations
+6. Run database migrations
 ```bash
 alembic upgrade head
 ```
@@ -57,13 +51,19 @@ alembic upgrade head
 
 ### Start API Service (Terminal 1)
 ```bash
-uvicorn src.api:app --reload --port 8000
+MODE=api uvicorn src.main:app --reload --port 8000
 ```
 
 ### Start Worker Service (Terminal 2)
 ```bash
-python -m src.worker_main
+MODE=worker uvicorn src.main:app --reload --port 9000
 ```
+
+**Note**: Both API and Worker use the same entry point (`src.main:app`). The `MODE` environment variable determines the behavior:
+- `MODE=api` - HTTP API server (enqueues jobs, no processing)
+- `MODE=worker` - Background job processor (no HTTP routes)
+
+Watch Terminal 2 (Worker) to see job processing logs.
 
 ## Usage
 
@@ -80,8 +80,8 @@ curl -X POST http://localhost:8000/v1/order \
     "table_id": "table-42",
     "meals": [
       {"menu_item_id": "burger", "metadata": {"no_onions": true}},
-      {"menu_item_id": "salad", "metadata": {}},
-      {"menu_item_id": "fries", "metadata": {}}
+      {"menu_item_id": "salad"},
+      {"menu_item_id": "fries"}
     ]
   }'
 ```
@@ -151,9 +151,9 @@ Build a single Docker image used by all services (API, Worker, Migration):
 docker build -t oban-eats:latest .
 ```
 
-The same image is used for all services (command is specified at runtime in the Kubernetes manifests):
-- **API**: Uses default CMD (`uvicorn src.api:app --host 0.0.0.0 --port 8000`)
-- **Worker**: Overrides with `command: ["python", "-m", "src.worker_main"]`
+The same image is used for all services with `MODE` environment variable controlling behavior:
+- **API**: `MODE=api` (default CMD: `uvicorn src.main:app --host 0.0.0.0 --port 8000`)
+- **Worker**: `MODE=worker` (same CMD, different behavior)
 - **Migration**: Overrides with `command: ["alembic", "upgrade", "head"]`
 
 ### Load Image into Minikube

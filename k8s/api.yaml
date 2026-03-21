@@ -47,11 +47,12 @@ spec:
       - name: api
         image: oban-eats:latest
         imagePullPolicy: IfNotPresent
-        # Uses default CMD from Dockerfile: uvicorn src.api:app --host 0.0.0.0 --port 8000
         ports:
         - containerPort: 8000
           name: http
         env:
+        - name: MODE
+          value: "api"
         - name: ENVIRONMENT
           valueFrom:
             configMapKeyRef:
