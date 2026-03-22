@@ -9,6 +9,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from src.config.settings import get_settings
 from src.model.db.base import Base
+from src.model.db.order_orm import OrderORM
+from src.model.db.order_meal_orm import OrderMealORM
 
 config = context.config
 

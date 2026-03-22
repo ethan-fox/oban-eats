@@ -29,10 +29,8 @@ def create_app() -> FastAPI:
     """
     Create FastAPI application instance.
 
-    Behavior controlled by MODE environment variable:
-    - MODE=api: HTTP routes + job enqueueing
-    - MODE=worker: Job processing only (no HTTP routes)
-    - MODE=listener: Event stream listener (future)
+    - API => REST API for user-invoked actions
+    - WORKER => Oban Jobs processing
     """
     settings = get_settings()
 

@@ -1,12 +1,7 @@
 from pydantic import BaseModel
+from uuid import UUID
 
 
 class MealOrderArgs(BaseModel):
-    order_id: str
-    menu_item_id: str
-    metadata: dict = {}
-
-
-    @property
-    def has_special_instructions(self):
-        return self.metadata != {}
+    order_id: UUID
+    meal_id: UUID
