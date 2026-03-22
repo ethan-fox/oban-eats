@@ -1,24 +1,26 @@
-# Oban-Playground: FastAPI + Oban-py Minimal Demo
+# Oban-Eats: FastAPI + Oban-py PoC
 
-A minimal FastAPI application demonstrating asynchronous job processing with oban-py and PostgreSQL. Optional deployment on Bare metal (docker desktop) or minikube
+Welcome to the **Oban Eats kitchen**! This repository features a food ordering workflow to show off the power of Oban for asynchronous job processing.
 
-## Domain Model
+Our Restaurant simulation is engaged by:
 
-This application simulates a **Restaurant Kitchen** where:
-- Orders are placed via REST API
-- Each meal in an order becomes a separate background job
-- Worker processes prepare meals asynchronously
+0. Place your order via REST API
+1. Each `meal` is managed as an independent job
+2. Worker(s) will prepare meals asynchronously, log when finished
+3. For the minikube deployment, view Job executions via Oban Web.
+
+## Quickstart
 
 ### Prerequisites
 - Python 3.12
 - Docker and Docker Compose (for PostgreSQL)
 
-### Installation
+### Install
 
 1. Create virtual environment
 ```bash
 python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate
 ```
 
 2. Install dependencies
@@ -36,51 +38,39 @@ cp .env.example .env
 docker-compose up -d
 ```
 
-5. Wait for PostgreSQL to be ready (about 5-10 seconds)
-```bash
-docker-compose ps
-# Wait until status shows "healthy"
-```
-
-6. Run database migrations
+5. Run database migrations
 ```bash
 alembic upgrade head
 ```
 
-## Running Locally
+### Run
 
 For the end-to-end experience, we will deploy two services:
 
-* `api`
-* `worker`
+* `api` - HTTP API service, handles job enqueues ONLY
+* `worker` - Async jobs processor, does not expose API routes
 
-- `MODE=api` - HTTP API server (enqueues jobs, no processing)
-- `MODE=worker` - Background job processor (no HTTP routes)
-### Start API Service (Terminal 1)
+#### API Service (Terminal 1)
+
 ```bash
 MODE=api uvicorn src.main:app --reload --port 8000
 ```
 
-### Start Worker Service (Terminal 2)
+#### Worker Service (Terminal 2)
+
 ```bash
-MODE=worker uvicorn src.main:app --reload --port 9000
+MODE=worker uvicorn src.main:app --reload --port 8001
 ```
 
-## Usage
+## Usage - Your first order
 
-### Health Check
-```bash
-curl http://localhost:8000/health
-```
-
-### Create an Order
 ```bash
 curl -X POST http://localhost:8000/v1/order \
   -H "Content-Type: application/json" \
   -d '{
     "table_id": "table-42",
     "meals": [
-      {"menu_item_id": "burger", "metadata": {"no_onions": true}},
+      {"menu_item_id": "burger", "metadata": {"exclude": ["lettuce"]}},
       {"menu_item_id": "salad"},
       {"menu_item_id": "fries"}
     ]
@@ -185,7 +175,7 @@ kubectl get pods -n oban-eats
 # Expected output:
 # postgres-xxx          1/1     Running
 # oban-api-xxx          1/1     Running
-# oban-worker-xxx       1/1     Running  (2 replicas)
+# oban-worker-xxx       1/1     Running
 # oban-ui-xxx           1/1     Running
 ```
 
@@ -224,7 +214,7 @@ curl -X POST http://localhost:8000/api/v1/order \
   -d '{
     "table_id": "table-k8s-test",
     "meals": [
-      {"menu_item_id": "burger", "metadata": {"no_onions": true}},
+      {"menu_item_id": "burger", "metadata": {"exclude": ["onions"]}},
       {"menu_item_id": "fries", "metadata": {}}
     ]
   }'
@@ -250,21 +240,7 @@ The Oban UI dashboard is available at:
 http://localhost:8000/oban
 ```
 
-For more info about Oban Web, see here (TODO)
-
-### Scaling
-
-Scale the API service:
-
-```bash
-kubectl scale deployment oban-api -n oban-eats --replicas=3
-```
-
-Scale the Worker service:
-
-```bash
-kubectl scale deployment oban-worker -n oban-eats --replicas=5
-```
+For more info about Oban Web, [see here](https://hexdocs.pm/oban_web/overview.html).
 
 ### Cleanup
 
