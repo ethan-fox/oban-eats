@@ -15,54 +15,55 @@ This application simulates a **Restaurant Kitchen** where:
 
 ### Installation
 
-1. Clone the repository
-```bash
-git clone <repo-url>
-cd oban-eats
-```
-
-2. Create virtual environment
+1. Create virtual environment
 ```bash
 python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-3. Install dependencies
+2. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-4. Configure environment
+3. Configure environment
 ```bash
 cp .env.example .env
 ```
 
-5. Start PostgreSQL
+4. Start PostgreSQL
 ```bash
 docker-compose up -d
 ```
 
-6. Wait for PostgreSQL to be ready (about 5-10 seconds)
+5. Wait for PostgreSQL to be ready (about 5-10 seconds)
 ```bash
 docker-compose ps
 # Wait until status shows "healthy"
 ```
 
-7. Run database migrations
+6. Run database migrations
 ```bash
 alembic upgrade head
 ```
 
 ## Running Locally
 
+For the end-to-end experience, we will deploy two services:
+
+* `api`
+* `worker`
+
+- `MODE=api` - HTTP API server (enqueues jobs, no processing)
+- `MODE=worker` - Background job processor (no HTTP routes)
 ### Start API Service (Terminal 1)
 ```bash
-uvicorn src.api:app --reload --port 8000
+MODE=api uvicorn src.main:app --reload --port 8000
 ```
 
 ### Start Worker Service (Terminal 2)
 ```bash
-python -m src.worker_main
+MODE=worker uvicorn src.main:app --reload --port 9000
 ```
 
 ## Usage
@@ -80,8 +81,8 @@ curl -X POST http://localhost:8000/v1/order \
     "table_id": "table-42",
     "meals": [
       {"menu_item_id": "burger", "metadata": {"no_onions": true}},
-      {"menu_item_id": "salad", "metadata": {}},
-      {"menu_item_id": "fries", "metadata": {}}
+      {"menu_item_id": "salad"},
+      {"menu_item_id": "fries"}
     ]
   }'
 ```
@@ -96,7 +97,7 @@ Response:
 }
 ```
 
-Watch the Worker service logs to see meals being prepared!
+Watch the service logs to see meals being prepared!
 
 ## Kubernetes Deployment (Minikube)
 
@@ -145,23 +146,12 @@ kubectl get svc -n ingress-nginx
 
 ### Build Docker Image
 
-Build a single Docker image used by all services (API, Worker, Migration):
+Configure your shell to use Minikube's Docker daemon, then build directly inside Minikube:
 
 ```bash
+eval $(minikube docker-env)
+
 docker build -t oban-eats:latest .
-```
-
-The same image is used for all services (command is specified at runtime in the Kubernetes manifests):
-- **API**: Uses default CMD (`uvicorn src.api:app --host 0.0.0.0 --port 8000`)
-- **Worker**: Overrides with `command: ["python", "-m", "src.worker_main"]`
-- **Migration**: Overrides with `command: ["alembic", "upgrade", "head"]`
-
-### Load Image into Minikube
-
-Minikube runs in its own Docker environment, so the image must be loaded (this may take a minute or two):
-
-```bash
-minikube image load oban-eats:latest
 ```
 
 ### Deploy to Kubernetes
@@ -169,17 +159,16 @@ minikube image load oban-eats:latest
 Apply manifests in order (infrastructure first, then applications):
 
 ```bash
-# Create namespace and configuration
 kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/configmap.yaml
 
-# Deploy PostgreSQL database
+# PostgreSQL
 kubectl apply -f k8s/db.yaml
 
 # Wait for database to be ready
 kubectl wait --for=condition=ready pod -l app=postgres -n oban-eats --timeout=120s
 
-# Deploy API, Worker, and Oban UI services
+# Application services
 kubectl apply -f k8s/api.yaml
 kubectl apply -f k8s/worker.yaml
 kubectl apply -f k8s/oban-ui.yaml
@@ -247,6 +236,12 @@ Watch worker logs to see job processing:
 kubectl logs -n oban-eats -l app=oban-worker -f
 ```
 
+To debug DB:
+
+```bash
+kubectl exec -it -n oban-eats <postgres pod name> -- psql -U admin -d oban_eats
+```
+
 ### Access Oban UI Dashboard
 
 The Oban UI dashboard is available at:
@@ -255,50 +250,7 @@ The Oban UI dashboard is available at:
 http://localhost:8000/oban
 ```
 
-The dashboard provides a web interface to:
-- Monitor job queues and execution status
-- View job details and history
-- Inspect failed jobs and errors
-- Cancel, retry, or delete jobs (if read-only mode is disabled)
-
-**Security Note**: For production use, enable HTTP Basic Authentication by uncommenting and setting the `BASIC_AUTH_USER` and `BASIC_AUTH_PASS` environment variables in `k8s/oban-ui.yaml`, then reapply the manifest.
-
-### Troubleshooting
-
-View pod details and events:
-
-```bash
-kubectl describe pod <pod-name> -n oban-eats
-```
-
-Check init container logs (if migration fails):
-
-```bash
-kubectl logs <pod-name> -n oban-eats -c migration
-```
-
-Check application logs:
-
-```bash
-# API logs
-kubectl logs -n oban-eats -l app=oban-api
-
-# Worker logs
-kubectl logs -n oban-eats -l app=oban-worker
-
-# Database logs
-kubectl logs -n oban-eats -l app=postgres
-
-# Oban UI logs
-kubectl logs -n oban-eats -l app=oban-ui
-```
-
-Connect to the database:
-
-```bash
-kubectl exec -it -n oban-eats <postgres-pod-name> -- \
-  psql -U admin oban_eats
-```
+For more info about Oban Web, see here (TODO)
 
 ### Scaling
 
@@ -332,34 +284,14 @@ kubectl delete -f k8s/configmap.yaml
 kubectl delete -f k8s/namespace.yaml
 ```
 
-## Architecture
+Revert Docker to use your local daemon:
 
-### Kubernetes Components
-
-```
-k8s/
-├── namespace.yaml          # Resource isolation
-├── configmap.yaml         # Application configuration
-├── db.yaml                # PostgreSQL with persistent storage
-├── api.yaml               # API deployment, service, ingress
-├── worker.yaml            # Worker deployment
-└── oban-ui.yaml           # Oban UI dashboard deployment, service, ingress
+```bash
+eval $(minikube docker-env -u)
 ```
 
-**Key Features:**
-- Single Docker image with runtime command overrides for API, Worker, and Migration
-- Init containers run database migrations before services start
-- PostgreSQL with persistent volume (survives pod restarts)
-- API exposed via LoadBalancer service
-- Worker scales independently (2 replicas by default)
-- Horizontal Pod Autoscaler for API (1-10 replicas based on CPU)
-- Health probes ensure reliability
+## TODO 
 
-## Future Enhancements
-
-- Production secrets management (Kubernetes Secrets)
-- Ingress controller for external access
 - Prometheus metrics and monitoring
 - Job status API endpoints
 - Retry policies and dead letter queue
-- Database replication for high availability

@@ -18,5 +18,5 @@ COPY . .
 # Expose port 8000 (used by API service)
 EXPOSE 8000
 
-# Default command (will be overridden for migration/worker)
-CMD ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000"]
+# Default command (MODE environment variable controls behavior)
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
