@@ -1,6 +1,6 @@
 # Oban-Eats: FastAPI + Oban-py PoC
 
-Welcome to the **Oban Eats kitchen**! This repository features a food ordering workflow to show off the power of Oban for asynchronous job processing.
+Welcome to the **Oban Eats kitchen**! This repository features a food ordering workflow to show off the power of [Oban](https://github.com/oban-bg/oban-py) for asynchronous job processing.
 
 Our Restaurant simulation is engaged by:
 
